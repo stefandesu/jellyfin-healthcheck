@@ -54,7 +54,7 @@ def _auth_header(token=None):
     )
     if token:
         h += f', Token="{token}"'
-    return {"X-Emby-Authorization": h}
+    return {"Authorization": h}
 
 
 # ── Logging setup ──────────────────────────────────────────────────────────────
