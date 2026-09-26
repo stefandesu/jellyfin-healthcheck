@@ -12,6 +12,7 @@ Runs five sequential checks:
 Usage:
   python3 jellyfin_healthcheck.py
   python3 jellyfin_healthcheck.py --host http://192.168.1.x:8096 --user admin --pass secret
+  python3 jellyfin_healthcheck.py --item-id <id>   # pin the item/file used for the stream checks
 
 Exit codes:
   0 = all checks passed
@@ -39,6 +40,7 @@ DEFAULTS = {
     "timeout":           int(os.getenv("JELLYFIN_TIMEOUT",    "10")),   # seconds, general
     "transcode_timeout": int(os.getenv("JELLYFIN_TC_TIMEOUT", "45")),   # seconds, transcode startup
     "log_file":          os.getenv("JELLYFIN_LOG",            ""),       # blank = stdout only
+    "item_id":           os.getenv("JELLYFIN_ITEM_ID",        ""),       # pin item/file ID for stream checks
     "stream_bytes":      65536,   # 64 KB — enough to confirm bytes are flowing
 }
 
@@ -124,7 +126,7 @@ def check_auth(host, user, password, timeout, log):
     return None, None
 
 
-def check_library(host, token, user_id, timeout, log):
+def check_library(host, token, user_id, timeout, log, cfg):
     """[3/5] Fetch two distinct random video items for independent stream checks."""
     t0 = time.time()
     try:
@@ -136,6 +138,19 @@ def check_library(host, token, user_id, timeout, log):
             "Limit":            10,
         })
         items = data.get("Items", [])
+        ms = (time.time() - t0) * 1000
+
+        # A pinned item/file ID (env var or --item-id) overrides random
+        # selection and is used for both stream checks.
+        pinned_id = cfg.get("item_id")
+        if pinned_id:
+            pinned = {"Id": pinned_id, "Name": f"pinned:{pinned_id[:8]}", "Type": "Pinned"}
+            log.info(
+                f"[3/5] Library    ✓  ({ms:.0f} ms)  "
+                f"using pinned item/file ID '{pinned_id}' for both stream checks"
+            )
+            return pinned, pinned
+
         if not items:
             log.warning("[3/5] Library    ✗  No video items found")
             return None, None
@@ -145,7 +160,6 @@ def check_library(host, token, user_id, timeout, log):
         else:
             direct_item = transcode_item = items[0]
 
-        ms = (time.time() - t0) * 1000
         log.info(
             f"[3/5] Library    ✓  ({ms:.0f} ms)  "
             f"direct='{direct_item.get('Name','?')}' ({direct_item.get('Type')})  "
@@ -435,7 +449,7 @@ def run(cfg: dict) -> int:
         return 1
 
     direct_item, transcode_item = check_library(
-        cfg["host"], token, user_id, cfg["timeout"], log)
+        cfg["host"], token, user_id, cfg["timeout"], log, cfg)
     results["library"] = direct_item is not None
     if not results["library"]:
         _summary(results, log)
@@ -473,6 +487,10 @@ if __name__ == "__main__":
     p.add_argument("--transcode-timeout", type=int, default=DEFAULTS["transcode_timeout"],
                    dest="transcode_timeout",
                    help="Transcode startup timeout in seconds (default: 45)")
+    p.add_argument("--item-id",           default=DEFAULTS["item_id"],
+                   dest="item_id",
+                   help="Pin a specific item/file ID for the direct and transcode "
+                        "stream checks (default: pick random items from the library)")
     p.add_argument("--log",               default=DEFAULTS["log_file"],
                    help="Append output to this log file")
     args = p.parse_args()
@@ -484,6 +502,7 @@ if __name__ == "__main__":
         "timeout":           args.timeout,
         "transcode_timeout": args.transcode_timeout,
         "log_file":          args.log,
+        "item_id":           args.item_id,
         "stream_bytes":      DEFAULTS["stream_bytes"],
     }
 

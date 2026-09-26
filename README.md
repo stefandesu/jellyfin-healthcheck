@@ -26,6 +26,7 @@ python3 jellyfin_healthcheck.py \
 export JELLYFIN_HOST=http://192.168.1.100:8096
 export JELLYFIN_USER=admin
 export JELLYFIN_PASS=secret
+export JELLYFIN_ITEM_ID=3f2a1b4c5d6e7f8091a2b3c4d5e6f708
 python3 jellyfin_healthcheck.py
 ```
 
@@ -38,6 +39,7 @@ python3 jellyfin_healthcheck.py
 | `--pass` | `JELLYFIN_PASS` | *(empty)* | Password |
 | `--timeout` | `JELLYFIN_TIMEOUT` | `10` | General request timeout (seconds) |
 | `--transcode-timeout` | `JELLYFIN_TC_TIMEOUT` | `45` | Transcode startup timeout (seconds) |
+| `--item-id` | `JELLYFIN_ITEM_ID` | *(random)* | Pin a specific item/file ID for the direct and transcode stream checks |
 | `--log` | `JELLYFIN_LOG` | *(stdout only)* | Log file path |
 
 ## Exit Codes
